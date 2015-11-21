@@ -3,23 +3,35 @@ create_png6 <- function() {
         library(dplyr)
         library(ggplot2)
         
+        # Read data files
         NEI <- readRDS("summarySCC_PM25.rds")
         SCC <- readRDS("Source_Classification_Code.rds")
         
+        # Determine SCC codes that have motor vehicles or motor cycles in Short.Name
         motor <- grep("Motor vehicles | Motorcycles", SCC$Short.Name, ignore.case = TRUE)
         scc_motor <- as.character(SCC$SCC[motor])
         
+        # filter NEI data for Motor vehicles or motor cycles
         NEI_motor <- NEI[NEI$SCC %in% scc_motor,]
+        
+        # filter NEI data for Baltimore City, Maryland
         NEI_motor_Baltimore <- filter(NEI_motor, fips == "24510")
+        NEI_motor_Baltimore$County <- "Baltimore City"
+        # filter NEI data for Los Angeles County
         NEI_motor_LosAngeles <- filter(NEI_motor, fips == "06037")
+        NEI_motor_LosAngeles$County <- "Los Angeles County"
+        # combine Baltimore and Los Angeles data
         NEI_motor_combined <- rbind(NEI_motor_Baltimore, NEI_motor_LosAngeles)
         
         png(file = "plot6.png", width = 480, height = 480, units = "px")
         
-        pollution_by_year <- ddply(NEI_motor_combined, c("year", "fips"), summarise, total_pollution = sum(Emissions))
+        # Calculate total pollution by summing per year and county
+        pollution_by_year <- ddply(NEI_motor_combined, c("year", "County"), summarise, total_pollution = sum(Emissions))
         
-        p <- qplot(year, total_pollution, data = pollution_by_year, type = "l", facets = .~fips, geom = c("point", "smooth"), method = "lm")
-        print(p)
+        # Create a line plot for total pollution by year, for each of the types
+        g <- ggplot(pollution_by_year, aes(year, total_pollution))
+        chart <- g + geom_point() + facet_grid(.~County) + geom_smooth(method = "lm") + ylab("Total PM2.5 emmision (tons)") + ggtitle("Motor vehicles/cycles PM2.5 emmisions by year")
+        print(chart)
         
         dev.off()        
 }
